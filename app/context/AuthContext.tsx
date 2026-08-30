@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase"; // تأكد إن مسار فايربيز عندك مظبوط
 
 interface User {
   fullName: string;
@@ -10,7 +12,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (userData: User) => void;
+  login: (userData: User) => Promise<void>;
   logout: () => void;
 }
 
@@ -26,9 +28,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = (userData: User) => {
-    setUser(userData);
-    localStorage.setItem("liqinahem_user", JSON.stringify(userData));
+  // دالة تسجيل الدخول والحفظ التلقائي في قاعدة البيانات (Firestore)
+  const login = async (userData: User) => {
+    try {
+      // 1. حفظ البيانات محلياً للسرعة
+      setUser(userData);
+      localStorage.setItem("liqinahem_user", JSON.stringify(userData));
+
+      // 2. حفظ أو تحديث المستخدم في Firestore باستخدام رقم الهاتف كـ ID
+      const userRef = doc(db, "users", userData.phone);
+      await setDoc(userRef, {
+        fullName: userData.fullName,
+        phone: userData.phone,
+        state: userData.state,
+        lastLogin: new Date().toISOString(),
+      }, { merge: true }); // الـ merge عشان لو المستخدم قديم ما يمسح بياناته القديمة ويحدثها بس
+
+    } catch (error) {
+      console.error("خطأ أثناء حفظ بيانات المستخدم في قاعدة البيانات:", error);
+    }
   };
 
   const logout = () => {
