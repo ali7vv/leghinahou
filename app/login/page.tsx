@@ -3,13 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, LogIn, Phone } from "lucide-react";
+import { ArrowRight, LogIn, Phone, User } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-// استيراد قاعدة البيانات - تأكد من مطابقة المسار لو مشروعك بستخدم @
 import { db } from "@/lib/firebase"; 
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 export default function LoginPage() {
+  const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const { login } = useAuth();
@@ -18,17 +18,20 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!fullName.trim()) {
+      alert("الرجاء إدخال الاسم الكريم");
+      return;
+    }
+
     if (!phone || phone.length < 9) {
       alert("الرجاء إدخال رقم هاتف صحيح");
       return;
     }
 
-    const fullName = phone === "0912345678" ? "محمد أحمد" : `مستخدم (${phone})`;
-
     try {
-      // حفظ البيانات في مجموعة users داخل Firestore
+      // حفظ البيانات في مجموعة users داخل Firestore مع الاسم البدخلو المستخدم
       await setDoc(doc(db, "users", phone), {
-        fullName: fullName,
+        fullName: fullName.trim(),
         phone: phone,
         state: "السودان",
         createdAt: serverTimestamp(),
@@ -36,7 +39,7 @@ export default function LoginPage() {
       }, { merge: true });
 
       login({
-        fullName: fullName,
+        fullName: fullName.trim(),
         phone: phone,
         state: "السودان",
       });
@@ -62,6 +65,25 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* خانة الاسم */}
+          <div>
+            <label className="block text-xs font-medium text-gray-300 mb-1.5">الاسم الكريم</label>
+            <div className="relative">
+              <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
+                <User className="w-4 h-4" />
+              </span>
+              <input 
+                type="text"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="أدخل اسمك هنا"
+                className="w-full pr-10 pl-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder-gray-500 outline-none focus:border-[#0EA5A5]"
+              />
+            </div>
+          </div>
+
+          {/* خانة الهاتف */}
           <div>
             <label className="block text-xs font-medium text-gray-300 mb-1.5">رقم الهاتف</label>
             <div className="relative">
@@ -79,6 +101,7 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* خانة كلمة السر */}
           <div>
             <label className="block text-xs font-medium text-gray-300 mb-1.5">كلمة السر</label>
             <input 
