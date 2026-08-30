@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, LogIn, Phone, User } from "lucide-react";
+import { ArrowRight, LogIn, Phone, User, Lock } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { db } from "@/lib/firebase"; 
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -29,7 +29,7 @@ export default function LoginPage() {
     }
 
     try {
-      // حفظ البيانات في مجموعة users داخل Firestore مع الاسم البدخلو المستخدم
+      // حفظ البيانات في مجموعة users داخل Firestore
       await setDoc(doc(db, "users", phone), {
         fullName: fullName.trim(),
         phone: phone,
@@ -57,7 +57,7 @@ export default function LoginPage() {
         <div className="flex items-center justify-between mb-6 border-b border-white/10 pb-4">
           <h1 className="text-xl font-bold flex items-center gap-2">
             <LogIn className="text-[#0EA5A5] w-5 h-5" />
-            تسجيل الدخول السريع
+            تسجيل الدخول للمنصة
           </h1>
           <Link href="/" className="text-xs text-gray-400 hover:text-white flex items-center gap-1 bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/10 transition">
             <ArrowRight className="w-3.5 h-3.5" /> الرئيسية
@@ -65,7 +65,7 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* خانة الاسم */}
+          {/* خانة الاسم أولاً */}
           <div>
             <label className="block text-xs font-medium text-gray-300 mb-1.5">الاسم الكريم</label>
             <div className="relative">
@@ -83,7 +83,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* خانة الهاتف */}
+          {/* خانة رقم الهاتف */}
           <div>
             <label className="block text-xs font-medium text-gray-300 mb-1.5">رقم الهاتف</label>
             <div className="relative">
@@ -104,23 +104,40 @@ export default function LoginPage() {
           {/* خانة كلمة السر */}
           <div>
             <label className="block text-xs font-medium text-gray-300 mb-1.5">كلمة السر</label>
-            <input 
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder-gray-500 outline-none focus:border-[#0EA5A5]"
-            />
+            <div className="relative">
+              <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
+                <Lock className="w-4 h-4" />
+              </span>
+              <input 
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full pr-10 pl-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder-gray-500 outline-none focus:border-[#0EA5A5]"
+              />
+            </div>
           </div>
 
           <button 
             type="submit"
             className="w-full bg-[#0EA5A5] hover:bg-[#0EA5A5]/90 text-white font-bold text-sm py-3 rounded-xl transition duration-200 mt-2 shadow-md cursor-pointer"
           >
-            دخول فوري للمنصة
+            دخول للمنصة
           </button>
         </form>
+
+        {/* فاصل أو زر جوجل لو حابب تخليه */}
+        <div className="mt-6 pt-4 border-t border-white/10 text-center">
+          <p className="text-xs text-gray-400 mb-3">أو المتابعة باستخدام</p>
+          <button 
+            type="button"
+            onClick={() => alert("ميزة جوجل ستتوفر قريباً، يرجى التسجيل بالاسم والرقم أعلاه")}
+            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-medium py-2.5 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <span>🌐</span> المتابعة باستخدام جوجل
+          </button>
+        </div>
 
         <p className="text-xs text-center text-gray-400 mt-6 pt-4 border-t border-white/5">
           ما عندك حساب؟{" "}
