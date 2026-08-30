@@ -29,7 +29,7 @@ export default function LoginPage() {
     }
 
     try {
-      // حفظ البيانات في مجموعة users داخل Firestore
+      // حفظ الاسم والرقم في قاعدة البيانات مباشرة
       await setDoc(doc(db, "users", phone), {
         fullName: fullName.trim(),
         phone: phone,
@@ -46,7 +46,7 @@ export default function LoginPage() {
 
       router.push("/");
     } catch (error) {
-      console.error("خطأ أثناء حفظ البيانات في قاعدة البيانات:", error);
+      console.error("خطأ أثناء حفظ البيانات:", error);
       alert("حدث خطأ أثناء تسجيل الدخول، يرجى المحاولة لاحقاً.");
     }
   };
@@ -65,7 +65,7 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* خانة الاسم أولاً */}
+          {/* خانة الاسم الكريم */}
           <div>
             <label className="block text-xs font-medium text-gray-300 mb-1.5">الاسم الكريم</label>
             <div className="relative">
@@ -126,18 +126,6 @@ export default function LoginPage() {
             دخول للمنصة
           </button>
         </form>
-
-        {/* فاصل أو زر جوجل لو حابب تخليه */}
-        <div className="mt-6 pt-4 border-t border-white/10 text-center">
-          <p className="text-xs text-gray-400 mb-3">أو المتابعة باستخدام</p>
-          <button 
-            type="button"
-            onClick={() => alert("ميزة جوجل ستتوفر قريباً، يرجى التسجيل بالاسم والرقم أعلاه")}
-            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-medium py-2.5 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <span>🌐</span> المتابعة باستخدام جوجل
-          </button>
-        </div>
 
         <p className="text-xs text-center text-gray-400 mt-6 pt-4 border-t border-white/5">
           ما عندك حساب؟{" "}
