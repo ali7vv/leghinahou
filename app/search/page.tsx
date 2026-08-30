@@ -4,6 +4,10 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, MapPin, Calendar, User, ArrowRight, X, Phone, FileText, Inbox, Trash2, ZoomIn } from "lucide-react";
 
+// استيراد قاعدة البيانات والدوال الخاصة بـ Firebase Firestore
+import { db } from "@/app/firebase";
+import { collection, onSnapshot, deleteDoc, doc } from "firebase/firestore";
+
 interface Report {
   id: string;
   name: string;
@@ -23,26 +27,35 @@ export default function SearchPage() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
+  // جلب البيانات بالوقت الفعلي (Real-time) من Firebase
   useEffect(() => {
-    loadReports();
+    const unsubscribe = onSnapshot(collection(db, "reports"), (snapshot) => {
+      const reportsData: Report[] = snapshot.docs.map((docItem) => ({
+        id: docItem.id,
+        ...docItem.data(),
+      })) as Report[];
+      
+      setReports(reportsData);
+    }, (error) => {
+      console.error("خطأ في جلب البلاغات:", error);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const loadReports = () => {
-    const saved = localStorage.getItem("liqinahem_reports");
-    const localReports: Report[] = saved ? JSON.parse(saved) : [];
-    setReports(localReports);
-  };
-
-  // دالة حذف البلاغ
-  const handleDeleteReport = (id: string, e?: React.MouseEvent) => {
+  // دالة حذف البلاغ من Firebase
+  const handleDeleteReport = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     
-    if (confirm("هل أنت تأكد من رغبتك في حذف هذا البلاغ؟")) {
-      const updatedReports = reports.filter((report) => report.id !== id);
-      localStorage.setItem("liqinahem_reports", JSON.stringify(updatedReports));
-      setReports(updatedReports);
-      if (selectedReport?.id === id) {
-        setSelectedReport(null);
+    if (confirm("هل أنت متأكد من رغبتك في حذف هذا البلاغ؟")) {
+      try {
+        await deleteDoc(doc(db, "reports", id));
+        if (selectedReport?.id === id) {
+          setSelectedReport(null);
+        }
+      } catch (error) {
+        console.error("خطأ أثناء حذف البلاغ:", error);
+        alert("حدث خطأ أثناء محاولة الحذف.");
       }
     }
   };
@@ -201,7 +214,6 @@ export default function SearchPage() {
               </button>
 
               <div className="flex items-center gap-4 border-b border-white/10 pb-4">
-                {/* إمكانية تكبير الصورة من داخل التفاصيل أيضاً */}
                 <div
                   onClick={() => selectedReport.image && setZoomedImage(selectedReport.image)}
                   className={`w-16 h-16 rounded-xl bg-white/5 border border-white/10 overflow-hidden flex items-center justify-center flex-shrink-0 relative group ${

@@ -5,9 +5,14 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowRight, Upload, CheckCircle2, User, Phone, MapPin, Calendar, FileText, Heart } from "lucide-react"
 
+// استيراد قاعدة البيانات من ملف الـ firebase البأنشأناهو
+import { db } from "@/app/firebase" // عدل المسار لو ملف الـ firebase موجود في مكان تاني مثل "@/lib/firebase"
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+
 export default function ReportPage() {
   const router = useRouter()
   const [submitted, setSubmitted] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
@@ -33,27 +38,30 @@ export default function ReportPage() {
     }
   }
 
-  // حفظ البلاغ في LocalStorage
-  const handleSubmit = (e: React.FormEvent) => {
+  // حفظ البلاغ في قاعدة بيانات Firebase Firestore
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setLoading(true)
 
-    const newReport = {
-      id: Date.now().toString(),
-      ...formData,
-      image: imagePreview,
-      createdAt: new Date().toISOString(),
+    try {
+      // إرسال البيانات مباشرة لسيرفر فايربيس (ليراها اللابتوب والتلفون فوراً)
+      await addDoc(collection(db, "reports"), {
+        ...formData,
+        image: imagePreview,
+        createdAt: serverTimestamp(),
+      })
+
+      setSubmitted(true)
+      setTimeout(() => {
+        router.push("/search") // أو صفحة العرض عندك
+      }, 3500)
+
+    } catch (error) {
+      console.error("خطأ أثناء رفع البلاغ:", error)
+      alert("حدث خطأ أثناء رفع البلاغ، تأكد من اتصال الإنترنت.")
+    } finally {
+      setLoading(false)
     }
-
-    const savedReports = localStorage.getItem("liqinahem_reports")
-    const reports = savedReports ? JSON.parse(savedReports) : []
-    
-    // إضافة البلاغ الجديد في بداية القائمة
-    localStorage.setItem("liqinahem_reports", JSON.stringify([newReport, ...reports]))
-
-    setSubmitted(true)
-    setTimeout(() => {
-      router.push("/search")
-    }, 3500) // زدت وقت الانتظار شوية عشان الزول يقرا الدعاء والرسالة المطمنة براحتو
   }
 
   return (
@@ -202,9 +210,10 @@ export default function ReportPage() {
             {/* زر الإرسال */}
             <button
               type="submit"
-              className="w-full bg-[#0EA5A5] hover:bg-[#0EA5A5]/90 text-white font-bold py-3 rounded-xl text-xs transition shadow-lg"
+              disabled={loading}
+              className="w-full bg-[#0EA5A5] hover:bg-[#0EA5A5]/90 text-white font-bold py-3 rounded-xl text-xs transition shadow-lg flex items-center justify-center"
             >
-              نشر البلاغ الآن
+              {loading ? "جاري نشر البلاغ..." : "نشر البلاغ الآن"}
             </button>
           </form>
         )}
