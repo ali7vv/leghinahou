@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, LogIn, Phone } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-// استيراد أدوات الفايربيز وقاعدة البيانات
-import { db } from "../lib/firebase"; // تأكد أن مسار ملف الـ firebase صحيح حسب مشروعك
+// استيراد قاعدة البيانات - تأكد من مطابقة المسار لو مشروعك بستخدم @
+import { db } from "@/lib/firebase"; 
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 export default function LoginPage() {
@@ -15,7 +15,6 @@ export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
 
-  // تسجيل دخول فوري وسريع وحفظ البيانات في Firestore
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -27,16 +26,15 @@ export default function LoginPage() {
     const fullName = phone === "0912345678" ? "محمد أحمد" : `مستخدم (${phone})`;
 
     try {
-      // حفظ البيانات تلقائياً في مجموعة (users) داخل Firestore باستخدام رقم الهاتف كمعرّف
+      // حفظ البيانات في مجموعة users داخل Firestore
       await setDoc(doc(db, "users", phone), {
         fullName: fullName,
         phone: phone,
         state: "السودان",
-        createdAt: serverTimestamp(), // وقت التسجيل
-        lastLogin: serverTimestamp(), // آخر دخول
+        createdAt: serverTimestamp(),
+        lastLogin: serverTimestamp(),
       }, { merge: true });
 
-      // حفظ بيانات المستخدم محلياً وإدخاله للمنصة فوراً
       login({
         fullName: fullName,
         phone: phone,
@@ -46,7 +44,7 @@ export default function LoginPage() {
       router.push("/");
     } catch (error) {
       console.error("خطأ أثناء حفظ البيانات في قاعدة البيانات:", error);
-      alert("حدث خطأ أثناء تسجيل الدخول، يجدر المحاولة لاحقاً.");
+      alert("حدث خطأ أثناء تسجيل الدخول، يرجى المحاولة لاحقاً.");
     }
   };
 
