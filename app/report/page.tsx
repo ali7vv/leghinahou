@@ -38,7 +38,7 @@ export default function ReportPage() {
     }
   };
 
-  // إرسال البلاغ مع الحمايات المدمجة
+  // إرسال البلاغ مع كافة حمايات التنقيح
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -54,13 +54,20 @@ export default function ReportPage() {
       return;
     }
 
-    // 1. فحص طول تفاصيل المفقود (يجب ألا تقل عن 10 حروف لمنع البلاغات العشوائية)
+    // 1. فحص وتنقيه رقم الهاتف (التأكد أنه يتكون من أرقام صحيحة وطول منطقي للسودان/الخارج)
+    const cleanPhone = phone.replace(/\s+/g, ""); // إزالة أي مسافات فارغة
+    if (cleanPhone.length < 9 || !/^[0-9+]+$/.test(cleanPhone)) {
+      alert("عذراً، رقم الهاتف غير صحيح. يرجى إدخال رقم هاتف صحيح للتواصل (مثل أرقام السودان تبدأ بـ 09 أو 01 أو +249).");
+      return;
+    }
+
+    // 2. فحص طول تفاصيل المفقود (يجب ألا تقل عن 10 حروف لمنع البلاغات العشوائية)
     if (details.trim().length < 10) {
       alert("عذراً، يجب أن تكون تفاصيل المفقود أو العلامات المميزة واضحة وكافية (أكثر من 10 حروف) لضمان المصداقية.");
       return;
     }
 
-    // 2. فلترة الكلمات النابية والغير لائقة في الاسم أو التفاصيل
+    // 3. فلترة الكلمات النابية والغير لائقة في الاسم أو التفاصيل
     const textToCheck = (name + " " + details).toLowerCase();
     const containsBadWord = badWords.some(word => textToCheck.includes(word));
     if (containsBadWord) {
@@ -68,7 +75,7 @@ export default function ReportPage() {
       return;
     }
 
-    // 3. حماية منع التكرار السريع (Rate Limiting محلي - منع إرسال بلاغ جديد إلا بعد دقيقة)
+    // 4. حماية منع التكرار السريع (Rate Limiting محلي - منع إرسال بلاغ جديد إلا بعد دقيقة)
     const lastReportTime = localStorage.getItem("last_report_time");
     const now = Date.now();
     if (lastReportTime && now - parseInt(lastReportTime) < 60000) {
@@ -84,7 +91,7 @@ export default function ReportPage() {
         state,
         city,
         missingSince,
-        phone,
+        phone: cleanPhone, // حفظ رقم الهاتف المنقح
         details,
         image: image || null,
         status: "missing",
@@ -216,7 +223,7 @@ export default function ReportPage() {
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="رقم الهاتف للتواصل"
+                placeholder="مثال: 0912345678"
                 className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#0EA5A5] dir-ltr text-right"
               />
             </div>
