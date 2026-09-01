@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { doc, setDoc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase"; // تأكد إن مسار فايربيز عندك مظبوط
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "../firebase"; // تم تصحيح المسار هنا ليطابق مكان ملف الفايربيس
 
 interface User {
   fullName: string;

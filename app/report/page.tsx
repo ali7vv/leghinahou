@@ -1,19 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-
-// استيراد الأثنتيكيشن وقاعدة البيانات بمسار صحيح من مجلد app
-import { db, auth } from "../firebase";
+import { useAuth } from "../context/AuthContext";
+import { db } from "../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
 
 export default function ReportPage() {
   const router = useRouter();
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth(); // سحب بيانات المستخدم من الـ Context المربوط بالـ localStorage
 
   // الحقول
   const [name, setName] = useState("");
@@ -25,19 +22,6 @@ export default function ReportPage() {
   const [details, setDetails] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  // التحقق الفوري من حالة تسجيل الدخول للمستخدم
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-      if (!currentUser) {
-        alert("عذراً، يجب تسجيل الدخول بحسابك أولاً لتتمكن من نشر بلاغ.");
-        router.push("/login"); // توجيه لصفحة تسجيل الدخول فوراً
-      }
-    });
-    return () => unsubscribe();
-  }, [router]);
 
   // تحويل الصورة لـ Base64
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -54,6 +38,8 @@ export default function ReportPage() {
   // إرسال البلاغ
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // التحقق من أن المستخدم مسجل دخول عبر الكونتكست
     if (!user) {
       alert("الرجاء تسجيل الدخول أولاً.");
       router.push("/login");
@@ -77,33 +63,42 @@ export default function ReportPage() {
         details,
         image: image || null,
         status: "missing",
-        userId: user.uid,
-        userEmail: user.email || "unknown",
+        userName: user.fullName,
+        userPhone: user.phone,
         createdAt: serverTimestamp(),
       });
 
-      alert("تم نشر البلاغ بنجاح!");
+      // رسالة النجاح المعززة بآيات الصبر والقلوب والمشاعر الدافئة
+      alert(
+        "✨ تم نشر البلاغ بنجاح 🤍\n\n" +
+        "﴿وَبَشِّرِ الصَّابِرِينَ﴾\n" +
+        "اللهم رد كل غائب إلى أهله سالماً معافى 🤲\n" +
+        "اصبروا واحتسبوا، وإن شاء الله ستلقونه قريباً وتقر أعينكم برؤيته سليماً معافى."
+      );
+      
+      // التحويل المباشر لصفحة البحث/البلاغات
       router.push("/search");
     } catch (error) {
       console.error("خطأ أثناء النشر:", error);
-      alert("حدث خطأ أثناء رفع البلاغ، تأكد من اتصال الإنترنت.");
+      alert("حدث خطأ أثناء رفع البلاغ، تأكد من اتصال الإنترنت وقواعد الصلاحيات.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // شاشة تحميل أثناء فحص حالة المستخدم
-  if (loading) {
+  // لو المستخدم غير مسجل دخول، اعرض له تنبيه احترافي
+  if (!user) {
     return (
-      <div className="min-h-screen bg-[#030914] text-white flex items-center justify-center">
-        <p className="text-xs text-gray-400">جاري التحقق من صلاحيات الحساب...</p>
+      <div className="min-h-screen bg-[#030914] text-white flex flex-col items-center justify-center p-4 text-center" dir="rtl">
+        <div className="bg-[#081322] border border-white/10 p-8 rounded-2xl max-w-md w-full space-y-4">
+          <h2 className="text-lg font-bold text-rose-400">تنبيه أمني</h2>
+          <p className="text-xs text-gray-300">يجب تسجيل الدخول بحسابك أولاً لكي تتمكن من نشر بلاغ مفقود لضمان المصداقية.</p>
+          <Link href="/login" className="block w-full bg-[#0EA5A5] text-white font-bold py-3 rounded-xl text-xs transition hover:bg-[#0EA5A5]/90">
+            الانتقال لصفحة تسجيل الدخول
+          </Link>
+        </div>
       </div>
     );
-  }
-
-  // لو ما مسجل ما نعرض الصفحة أساساً
-  if (!user) {
-    return null;
   }
 
   return (
@@ -114,7 +109,7 @@ export default function ReportPage() {
         <div className="flex items-center justify-between pb-6 border-b border-white/10">
           <div>
             <h1 className="text-xl font-bold">إضافة بلاغ مفقود جديد</h1>
-            <p className="text-xs text-gray-400 mt-1">البلاغات تتطلب تسجيل الدخول لضمان المصداقية.</p>
+            <p className="text-xs text-gray-400 mt-1">أهلاً بك، {user.fullName} ({user.phone})</p>
           </div>
           <Link href="/" className="text-xs text-gray-400 hover:text-white flex items-center gap-1 bg-white/5 px-3 py-2 rounded-xl border border-white/10 transition">
             <ArrowRight className="w-4 h-4" /> الرئيسية
@@ -223,7 +218,7 @@ export default function ReportPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-[#0EA5A5] hover:bg-[#0EA5A5]/90 text-white font-bold py-3.5 rounded-xl text-xs transition"
+            className="w-full bg-[#0EA5A5] hover:bg-[#0EA5A5]/90 text-white font-bold py-3.5 rounded-xl text-xs transition cursor-pointer"
           >
             {submitting ? "جاري نشر البلاغ..." : "نشر البلاغ رسمياً"}
           </button>

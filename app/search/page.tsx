@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Search, MapPin, Calendar, User, ArrowRight, X, Phone, FileText, Inbox, Trash2, ZoomIn } from "lucide-react";
 
 // استيراد قاعدة البيانات والدوال الخاصة بـ Firebase Firestore
-import { db } from "@/app/firebase";
+import { db } from "@/app/firebase"; 
 import { collection, onSnapshot, deleteDoc, doc } from "firebase/firestore";
 
 interface Report {
@@ -19,6 +19,7 @@ interface Report {
   details?: string;
   image?: string | null;
   status?: string;
+  createdAt?: any;
 }
 
 export default function SearchPage() {
@@ -27,13 +28,34 @@ export default function SearchPage() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
-  // جلب البيانات بالوقت الفعلي (Real-time) من Firebase
+  // جلب البيانات بالوقت الفعلي (Real-time) من Firebase بدون أي شروط صارمة تمنع ظهور البلاغات
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "reports"), (snapshot) => {
-      const reportsData: Report[] = snapshot.docs.map((docItem) => ({
-        id: docItem.id,
-        ...docItem.data(),
-      })) as Report[];
+    const q = collection(db, "reports");
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const reportsData: Report[] = snapshot.docs.map((docItem) => {
+        const data = docItem.data();
+        return {
+          id: docItem.id,
+          name: data.name || "بدون اسم",
+          age: data.age || "",
+          state: data.state || "",
+          city: data.city || "",
+          missingSince: data.missingSince || "",
+          phone: data.phone || "",
+          details: data.details || "",
+          image: data.image || null,
+          status: data.status || "missing",
+          createdAt: data.createdAt,
+        };
+      }) as Report[];
+      
+      // ترتيب البلاغات من الأحدث للأقدم برمجياً بأمان تام
+      reportsData.sort((a: any, b: any) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+        return timeB - timeA;
+      });
       
       setReports(reportsData);
     }, (error) => {

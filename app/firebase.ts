@@ -1,5 +1,6 @@
-import { initializeApp, getApps } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCJi_9xu3fINuRdcCbNbk7Ib4zVvvmWQmE",
@@ -11,6 +12,7 @@ const firebaseConfig = {
   measurementId: "G-5C6H3MBDR6"
 };
 
-// تهيئة فايربيس (مع التأكد من عدم تكرار التهيئة)
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
 export const db = getFirestore(app);
+export const auth = getAuth(app);

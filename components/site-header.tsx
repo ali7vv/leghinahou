@@ -1,11 +1,11 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { Heart, Phone, Info, LogIn, User, LogOut } from "lucide-react"
-import { useAuth } from "@/app/context/AuthContext" // تأكد من مسار الـ context
+import Link from "next/link";
+import { Heart, Phone, Info, LogIn, User, LogOut } from "lucide-react";
+import { useAuth } from "@/app/context/AuthContext"; // تأكد من مسار الـ context
 
-export function SiteHeader() {
-  const { user, logout } = useAuth() // جلب بيانات المستخدم ووظيفة الخروج
+export default function SiteHeader() {
+  const { user, logout } = useAuth(); // جلب بيانات المستخدم ووظيفة الخروج
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-slate-900/60 backdrop-blur-xl">
@@ -41,7 +41,7 @@ export function SiteHeader() {
 
           {/* التحقق من حالة تسجيل الدخول */}
           {user ? (
-            // لو المستخدم مسجل دخول، بنعرض اسمه وملفه الشخصي ونخفي زر تسجيل الدخول
+            // لو المستخدم مسجل دخول، بنعرض اسمه وملفه الشخصي وزر الخروج
             <div className="flex items-center gap-3">
               <Link 
                 href="/profile" 
@@ -56,7 +56,7 @@ export function SiteHeader() {
               <button 
                 onClick={logout}
                 title="تسجيل الخروج"
-                className="p-2 text-slate-400 hover:text-rose-400 bg-white/5 hover:bg-white/10 rounded-xl transition border border-white/10"
+                className="p-2 text-slate-400 hover:text-rose-400 bg-white/5 hover:bg-white/10 rounded-xl transition border border-white/10 cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -75,5 +75,5 @@ export function SiteHeader() {
 
       </div>
     </header>
-  )
+  );
 }
