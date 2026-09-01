@@ -1,21 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-
-// قائمة الكلمات الممنوعة (يمكنك إضافة أو تعديل أي كلمات حسب الحاجة)
-const badWords = ["سب", "شتم", "كلمة_سيئة", "لعب", "اختبار_فاسد"];
+import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 
 export default function ReportPage() {
   const router = useRouter();
-  const { user } = useAuth(); // سحب بيانات المستخدم من الـ Context المربوط بالـ localStorage
+  const { user } = useAuth();
 
-  // الحقول
+  // الحقول الأساسية
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [state, setState] = useState("");
@@ -24,6 +22,11 @@ export default function ReportPage() {
   const [phone, setPhone] = useState("");
   const [details, setDetails] = useState("");
   const [image, setImage] = useState<string | null>(null);
+
+  // حالات التحقق برقم الهاتف (OTP)
+  const [verificationCode, setVerificationCode] = useState("");
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [codeSent, setCodeSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // تحويل الصورة لـ Base64
@@ -31,67 +34,94 @@ export default function ReportPage() {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setImage(reader.result as string);
-      };
+      reader.onloadend = () => setImage(reader.result as string);
       reader.readAsDataURL(file);
     }
   };
 
-  // إرسال البلاغ مع كافة حمايات التنقيح
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // إعداد حماية الـ reCAPTCHA (مطلوبة من فايربيز للتحقق من الأرقام)
+  useEffect(() => {
+    if (!(window as any).recaptchaVerifier) {
+      (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
+        size: "invisible",
+        callback: () => {
+          // تم التحقق بنجاح من أن المستخدم ليس روبوت
+        },
+      });
+    }
+  }, []);
+
+  // خطوة 1: إرسال كود التحقق لرقم الهاتف
+  const handleSendCode = async () => {
+    const cleanPhone = phone.replace(/\s+/g, "").replace(/-/g, "");
     
-    // التحقق من أن المستخدم مسجل دخول عبر الكونتكست
+    // فحص مبدئي للرقم السوداني أو الدولي
+    const isSudanLocal = /^(09|01)\d{8}$/.test(cleanPhone);
+    const isSudanInternational = /^(\+249|249)\d{9}$/.test(cleanPhone);
+
+    if (!isSudanLocal && !isSudanInternational) {
+      alert("عذراً، رقم الهاتف غير صحيح. يرجى إدخال رقم هاتف سوداني صحيح (يبدأ بـ 09 أو 01).");
+      return;
+    }
+
+    // تنسيق الرقم بالصيغة الدولية المطلوبة لـ Firebase (+249...)
+    const formattedPhone = isSudanLocal ? `+249${cleanPhone.substring(1)}` : `+${cleanPhone.replace(/^0+/, '')}`;
+
+    try {
+      setSubmitting(true);
+      const appVerifier = (window as any).recaptchaVerifier;
+      const confirmation = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
+      setConfirmationResult(confirmation);
+      setCodeSent(true);
+      alert("تم إرسال كود التحقق إلى رقم هاتفكم بنجاح 📩");
+    } catch (error: any) {
+      console.error("خطأ في إرسال الكود:", error);
+      alert("فشل إرسال كود التحقق. تأكد من صحة الرقم أو جرب لاحقاً. (تأكد من تفعيل Phone Auth في Firebase)");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // خطوة 2: تأكيد الكود وإرسال البلاغ نهائياً
+  const handleSubmitReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+
     if (!user) {
       alert("الرجاء تسجيل الدخول أولاً.");
       router.push("/login");
       return;
     }
 
-    if (!name || !age || !phone) {
-      alert("الرجاء تعبئة الحقول الأساسية (الاسم، العمر، ورقم التواصل).");
+    if (!confirmationResult) {
+      alert("الرجاء إرسال كود التحقق أولاً.");
       return;
     }
 
-    // 1. فحص وتنقيه رقم الهاتف (التأكد أنه يتكون من أرقام صحيحة وطول منطقي للسودان/الخارج)
-    const cleanPhone = phone.replace(/\s+/g, ""); // إزالة أي مسافات فارغة
-    if (cleanPhone.length < 9 || !/^[0-9+]+$/.test(cleanPhone)) {
-      alert("عذراً، رقم الهاتف غير صحيح. يرجى إدخال رقم هاتف صحيح للتواصل (مثل أرقام السودان تبدأ بـ 09 أو 01 أو +249).");
+    if (!verificationCode || verificationCode.length < 6) {
+      alert("الرجاء إدخال كود التحقق المكون من 6 أرقام بشكل صحيح.");
       return;
     }
 
-    // 2. فحص طول تفاصيل المفقود (يجب ألا تقل عن 10 حروف لمنع البلاغات العشوائية)
     if (details.trim().length < 10) {
-      alert("عذراً، يجب أن تكون تفاصيل المفقود أو العلامات المميزة واضحة وكافية (أكثر من 10 حروف) لضمان المصداقية.");
+      alert("عذراً، يجب أن تكون تفاصيل المفقود أكثر من 10 حروف لضمان المصداقية.");
       return;
     }
 
-    // 3. فلترة الكلمات النابية والغير لائقة في الاسم أو التفاصيل
-    const textToCheck = (name + " " + details).toLowerCase();
-    const containsBadWord = badWords.some(word => textToCheck.includes(word));
-    if (containsBadWord) {
-      alert("عذراً، يحتوي البلاغ على كلمات غير لائقة أو ممنوعة. يرجى استخدام لغة محترمة.");
-      return;
-    }
-
-    // 4. حماية منع التكرار السريع (Rate Limiting محلي - منع إرسال بلاغ جديد إلا بعد دقيقة)
-    const lastReportTime = localStorage.getItem("last_report_time");
-    const now = Date.now();
-    if (lastReportTime && now - parseInt(lastReportTime) < 60000) {
-      alert("الرجاء الانتظار لمدة دقيقة واحدة قبل إرسال بلاغ جديد لمنع الضغط والسبام على المنصة.");
-      return;
-    }
-
-    setSubmitting(true);
     try {
+      setSubmitting(true);
+
+      // تأكيد كود الـ OTP عبر فايربيز
+      await confirmationResult.confirm(verificationCode);
+
+      // رفع البلاغ للـ Firestore بعد نجاح التحقق التام من الرقم
+      const cleanPhone = phone.replace(/\s+/g, "").replace(/-/g, "");
       await addDoc(collection(db, "reports"), {
         name,
         age,
         state,
         city,
         missingSince,
-        phone: cleanPhone, // حفظ رقم الهاتف المنقح
+        phone: cleanPhone,
         details,
         image: image || null,
         status: "missing",
@@ -100,36 +130,29 @@ export default function ReportPage() {
         createdAt: serverTimestamp(),
       });
 
-      // تسجيل وقت آخر بلاغ ناجح للـ Cooldown
-      localStorage.setItem("last_report_time", now.toString());
-
-      // رسالة النجاح المعززة بآيات الصبر والقلوب والمشاعر الدافئة
       alert(
-        "✨ تم نشر البلاغ بنجاح 🤍\n\n" +
+        "✨ تم التحقق من الرقم ونشر البلاغ بنجاح 🤍\n\n" +
         "﴿وَبَشِّرِ الصَّابِرِينَ﴾\n" +
-        "اللهم رد كل غائب إلى أهله سالماً معافى 🤲\n" +
-        "اصبروا واحتسبوا، وإن شاء الله ستلقونه قريباً وتقر أعينكم برؤيته سليماً معافى."
+        "اللهم رد كل غائب إلى أهله سالماً معافى 🤲"
       );
-      
-      // التحويل المباشر لصفحة البحث/البلاغات
+
       router.push("/search");
-    } catch (error) {
-      console.error("خطأ أثناء النشر:", error);
-      alert("حدث خطأ أثناء رفع البلاغ، تأكد من اتصال الإنترنت وقواعد الصلاحيات.");
+    } catch (error: any) {
+      console.error("خطأ في التحقق أو النشر:", error);
+      alert("كود التحقق غير صحيح أو انتهت صلاحيته. يرجى التأكد وإعادة المحاولة.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // لو المستخدم غير مسجل دخول، اعرض له تنبيه احترافي
   if (!user) {
     return (
       <div className="min-h-screen bg-[#030914] text-white flex flex-col items-center justify-center p-4 text-center" dir="rtl">
         <div className="bg-[#081322] border border-white/10 p-8 rounded-2xl max-w-md w-full space-y-4">
           <h2 className="text-lg font-bold text-rose-400">تنبيه أمني</h2>
-          <p className="text-xs text-gray-300">يجب تسجيل الدخول بحسابك أولاً لكي تتمكن من نشر بلاغ مفقود لضمان المصداقية.</p>
+          <p className="text-xs text-gray-300">يجب تسجيل الدخول بحسابك أولاً لكي تتمكن من نشر بلاغ مفقود.</p>
           <Link href="/login" className="block w-full bg-[#0EA5A5] text-white font-bold py-3 rounded-xl text-xs transition hover:bg-[#0EA5A5]/90">
-            الانتقال لصفحة تسجيل الدخول
+            تسجيل الدخول
           </Link>
         </div>
       </div>
@@ -138,13 +161,15 @@ export default function ReportPage() {
 
   return (
     <div className="min-h-screen bg-[#030914] text-white p-4 md:p-8" dir="rtl">
+      <div id="recaptcha-container"></div> {/* عنصر الـ reCAPTCHA المخفي */}
+      
       <div className="max-w-3xl mx-auto space-y-6">
         
         {/* الشريط العلوي */}
         <div className="flex items-center justify-between pb-6 border-b border-white/10">
           <div>
-            <h1 className="text-xl font-bold">إضافة بلاغ مفقود جديد</h1>
-            <p className="text-xs text-gray-400 mt-1">أهلاً بك، {user.fullName} ({user.phone})</p>
+            <h1 className="text-xl font-bold">إضافة بلاغ مفقود مع التحقق برقم الهاتف</h1>
+            <p className="text-xs text-gray-400 mt-1">أهلاً بك، {user.fullName}</p>
           </div>
           <Link href="/" className="text-xs text-gray-400 hover:text-white flex items-center gap-1 bg-white/5 px-3 py-2 rounded-xl border border-white/10 transition">
             <ArrowRight className="w-4 h-4" /> الرئيسية
@@ -152,7 +177,7 @@ export default function ReportPage() {
         </div>
 
         {/* نموذج البلاغ */}
-        <form onSubmit={handleSubmit} className="bg-[#081322] border border-white/10 rounded-2xl p-6 space-y-5">
+        <form onSubmit={handleSubmitReport} className="bg-[#081322] border border-white/10 rounded-2xl p-6 space-y-5">
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -187,7 +212,7 @@ export default function ReportPage() {
                 type="text"
                 value={state}
                 onChange={(e) => setState(e.target.value)}
-                placeholder="مثال: الخرطوم، الجزيرة..."
+                placeholder="مثال: الخرطوم..."
                 className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#0EA5A5]"
               />
             </div>
@@ -198,7 +223,7 @@ export default function ReportPage() {
                 type="text"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                placeholder="مثال: أمدرمان، الحتانة..."
+                placeholder="مثال: أمدرمان..."
                 className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#0EA5A5]"
               />
             </div>
@@ -211,23 +236,52 @@ export default function ReportPage() {
                 type="text"
                 value={missingSince}
                 onChange={(e) => setMissingSince(e.target.value)}
-                placeholder="مثال: أمس، الأسبوع الماضي..."
+                placeholder="مثال: أمس..."
                 className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#0EA5A5]"
               />
             </div>
 
             <div>
-              <label className="text-xs text-gray-300 block mb-1">رقم التواصل <span className="text-rose-500">*</span></label>
-              <input
-                type="text"
-                required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="مثال: 0912345678"
-                className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#0EA5A5] dir-ltr text-right"
-              />
+              <label className="text-xs text-gray-300 block mb-1">رقم التواصل المراد التحقق منه <span className="text-rose-500">*</span></label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  required
+                  disabled={codeSent}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="0912345678"
+                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#0EA5Id5] dir-ltr text-right disabled:opacity-50"
+                />
+                {!codeSent && (
+                  <button
+                    type="button"
+                    onClick={handleSendCode}
+                    disabled={submitting}
+                    className="bg-[#0EA5A5] hover:bg-[#0EA5A5]/90 text-white font-bold px-4 py-3 rounded-xl text-xs whitespace-nowrap transition cursor-pointer disabled:opacity-50"
+                  >
+                    إرسال الكود
+                  </button>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* حقل إدخال كود التحقق (يظهر فقط بعد إرسال الكود) */}
+          {codeSent && (
+            <div className="bg-[#0EA5A5]/10 border border-[#0EA5A5]/30 p-4 rounded-xl space-y-2">
+              <label className="text-xs text-[#0EA5A5] font-bold block">أدخل كود التحقق المكون من 6 أرقام المرسل لهاتفك:</label>
+              <input
+                type="text"
+                maxLength={6}
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value)}
+                placeholder="123456"
+                className="w-full p-3 bg-white/5 border border-[#0EA5A5]/50 rounded-xl text-xs text-white outline-none tracking-widest text-center font-bold text-lg"
+              />
+              <p className="text-[10px] text-gray-400">إذا لم يصلك الكود، تأكد من الرقم أو أعد تحديث الصفحة.</p>
+            </div>
+          )}
 
           <div>
             <label className="text-xs text-gray-300 block mb-1">صورة المفقود (اختياري)</label>
@@ -235,7 +289,7 @@ export default function ReportPage() {
               type="file"
               accept="image/*"
               onChange={handleImageChange}
-              className="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-xs text-gray-400 file:ml-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#0EA5A5] file:text-white hover:file:bg-[#0EA5A5]/80"
+              className="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-xs text-gray-400 file:ml-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#0EA5A5] file:text-white"
             />
           </div>
 
@@ -245,17 +299,17 @@ export default function ReportPage() {
               rows={4}
               value={details}
               onChange={(e) => setDetails(e.target.value)}
-              placeholder="اكتب أي معلومات أخرى تفيد في العثور عليه..."
+              placeholder="اكتب أي معلومات أخرى..."
               className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#0EA5A5] resize-none"
             />
           </div>
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !codeSent}
             className="w-full bg-[#0EA5A5] hover:bg-[#0EA5A5]/90 text-white font-bold py-3.5 rounded-xl text-xs transition cursor-pointer disabled:opacity-50"
           >
-            {submitting ? "جاري نشر البلاغ..." : "نشر البلاغ رسمياً"}
+            {submitting ? "جاري التحقق والنشر..." : "تأكيد الكود ونشر البلاغ رسمياً"}
           </button>
 
         </form>
