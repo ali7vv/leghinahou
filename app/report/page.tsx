@@ -72,7 +72,7 @@ export default function ReportPage() {
         phone: cleanPhone,
         details,
         image: image || null,
-        status: "missing",
+        status: "نشط",
         userName: user.fullName || "مستخدم",
         userPhone: user.phone || "",
         createdAt: serverTimestamp(),
@@ -87,7 +87,15 @@ export default function ReportPage() {
         "اللهم رد كل غائب إلى أهله سالماً معافى 🤲"
       );
 
-      router.push("/search");
+      // توجيه المستخدم للصفحة الرئيسية مع التمرير التلقائي (Scroll) لقسم أحدث البلاغات
+      router.push("/");
+      setTimeout(() => {
+        const element = document.getElementById("latest-reports-section");
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth" });
+        }
+      }, 500);
+
     } catch (error: any) {
       console.error("خطأ في النشر:", error);
       alert("حدث خطأ أثناء نشر البلاغ. تأكد من اتصالك بالإنترنت وجرب لاحقاً.");
