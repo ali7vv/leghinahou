@@ -8,6 +8,9 @@ import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
+// قائمة الكلمات الممنوعة (يمكنك إضافة أو تعديل أي كلمات حسب الحاجة)
+const badWords = ["سب", "شتم", "كلمة_سيئة", "لعب", "اختبار_فاسد"];
+
 export default function ReportPage() {
   const router = useRouter();
   const { user } = useAuth(); // سحب بيانات المستخدم من الـ Context المربوط بالـ localStorage
@@ -35,7 +38,7 @@ export default function ReportPage() {
     }
   };
 
-  // إرسال البلاغ
+  // إرسال البلاغ مع الحمايات المدمجة
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -48,6 +51,28 @@ export default function ReportPage() {
 
     if (!name || !age || !phone) {
       alert("الرجاء تعبئة الحقول الأساسية (الاسم، العمر، ورقم التواصل).");
+      return;
+    }
+
+    // 1. فحص طول تفاصيل المفقود (يجب ألا تقل عن 10 حروف لمنع البلاغات العشوائية)
+    if (details.trim().length < 10) {
+      alert("عذراً، يجب أن تكون تفاصيل المفقود أو العلامات المميزة واضحة وكافية (أكثر من 10 حروف) لضمان المصداقية.");
+      return;
+    }
+
+    // 2. فلترة الكلمات النابية والغير لائقة في الاسم أو التفاصيل
+    const textToCheck = (name + " " + details).toLowerCase();
+    const containsBadWord = badWords.some(word => textToCheck.includes(word));
+    if (containsBadWord) {
+      alert("عذراً، يحتوي البلاغ على كلمات غير لائقة أو ممنوعة. يرجى استخدام لغة محترمة.");
+      return;
+    }
+
+    // 3. حماية منع التكرار السريع (Rate Limiting محلي - منع إرسال بلاغ جديد إلا بعد دقيقة)
+    const lastReportTime = localStorage.getItem("last_report_time");
+    const now = Date.now();
+    if (lastReportTime && now - parseInt(lastReportTime) < 60000) {
+      alert("الرجاء الانتظار لمدة دقيقة واحدة قبل إرسال بلاغ جديد لمنع الضغط والسبام على المنصة.");
       return;
     }
 
@@ -67,6 +92,9 @@ export default function ReportPage() {
         userPhone: user.phone,
         createdAt: serverTimestamp(),
       });
+
+      // تسجيل وقت آخر بلاغ ناجح للـ Cooldown
+      localStorage.setItem("last_report_time", now.toString());
 
       // رسالة النجاح المعززة بآيات الصبر والقلوب والمشاعر الدافئة
       alert(
@@ -205,7 +233,7 @@ export default function ReportPage() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-300 block mb-1">تفاصيل إضافية أو علامات مميزة</label>
+            <label className="text-xs text-gray-300 block mb-1">تفاصيل إضافية أو علامات مميزة (أكثر من 10 حروف)</label>
             <textarea
               rows={4}
               value={details}
@@ -218,7 +246,7 @@ export default function ReportPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-[#0EA5A5] hover:bg-[#0EA5A5]/90 text-white font-bold py-3.5 rounded-xl text-xs transition cursor-pointer"
+            className="w-full bg-[#0EA5A5] hover:bg-[#0EA5A5]/90 text-white font-bold py-3.5 rounded-xl text-xs transition cursor-pointer disabled:opacity-50"
           >
             {submitting ? "جاري نشر البلاغ..." : "نشر البلاغ رسمياً"}
           </button>
