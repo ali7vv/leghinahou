@@ -4,7 +4,7 @@ import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
 import { db, auth } from "../firebase";
 import Link from "next/link";
-import { ArrowRight, Users, FileText, ShieldCheck, Phone, Lock, Mail, LogOut, Trash2, Calendar, MapPin } from "lucide-react";
+import { ArrowRight, Users, FileText, ShieldCheck, Phone, Lock, Mail, LogOut, Trash2, MapPin } from "lucide-react";
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([]);
@@ -66,8 +66,13 @@ export default function AdminDashboard() {
     await signOut(auth);
   };
 
-  // دالة حذف أي بلاغ عشوائي أو مزعج بضغطة زر
+  // دالة حذف البلاغ (محمية بالكامل: تتاكد من إيميلك قبل أي عملية)
   const handleDeleteReport = async (reportId: string) => {
+    if (!user || user.email !== "b3eed2009@gmail.com") {
+      alert("عذراً، لا تمتلك صلاحية الحذف!");
+      return;
+    }
+
     if (confirm("هل أنت متأكد من حذف هذا البلاغ نهائياً؟")) {
       try {
         await deleteDoc(doc(db, "reports", reportId));
@@ -197,9 +202,9 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* قسم البلاغات مع زر الحذف للإدارة */}
+        {/* قسم البلاغات */}
         <div className="space-y-4">
-          <h2 className="text-lg font-bold text-white border-r-2 border-[#0EA5A5] pr-2">إدارة البلاغات (حذف اللعب والبلاغات الوهمية)</h2>
+          <h2 className="text-lg font-bold text-white border-r-2 border-[#0EA5A5] pr-2">إدارة البلاغات</h2>
           {loading ? (
             <p className="text-xs text-gray-400">جاري تحميل البلاغات...</p>
           ) : reports.length === 0 ? (
@@ -225,12 +230,16 @@ export default function AdminDashboard() {
 
                   <div className="flex items-center justify-between pt-2 border-t border-white/5">
                     <span className="text-[10px] text-gray-500 font-mono">ID: {report.id}</span>
-                    <button
-                      onClick={() => handleDeleteReport(report.id)}
-                      className="inline-flex items-center gap-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs px-3 py-1.5 rounded-xl transition border border-red-500/20"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> حذف البلاغ
-                    </button>
+                    
+                    {/* زر الحذف مخفي تماماً ولا يظهر ولا يعمل إلا لإيميلك الشخصي فقط */}
+                    {user && user.email === "b3eed2009@gmail.com" && (
+                      <button
+                        onClick={() => handleDeleteReport(report.id)}
+                        className="inline-flex items-center gap-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs px-3 py-1.5 rounded-xl transition border border-red-500/20"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> حذف البلاغ
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
