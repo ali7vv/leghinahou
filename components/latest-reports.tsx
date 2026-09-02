@@ -1,13 +1,13 @@
 "use client";
-import { useEffect, useState } from "react";
+
+import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, query, orderBy, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/app/firebase";
-import { Search, MapPin, CheckCircle, MessageCircle, Facebook, Phone, Calendar, User, Clock } from "lucide-react";
+import { Search, MapPin, CheckCircle, MessageCircle, Facebook, User } from "lucide-react";
 
-export function LatestReports() {
+export default function LatestReports() {
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("الكل");
 
@@ -57,20 +57,28 @@ export function LatestReports() {
   });
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-12" dir="rtl">
-      
-      {/* عنوان القسم */}
+    <section id="latest-reports-section" className="mx-auto max-w-6xl px-4 py-12" dir="rtl">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-foreground">أحدث البلاغات المباشرة</h2>
           <p className="text-xs text-muted-foreground mt-1">تابع أحدث حالات المفقودات وساهم في نشرها</p>
         </div>
-        <span className="text-xs text-[#0EA5A5] bg-[#0EA5A5]/10 border border-[#0EA5A5]/20 px-3 py-1.5 rounded-xl font-bold">
-          {filteredReports.length} بلاغ نشط
-        </span>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => {
+              setSearchTerm("");
+              setSelectedLocation("الكل");
+            }}
+            className="text-xs text-[#0EA5A5] hover:underline font-bold cursor-pointer transition"
+          >
+            عرض الكل
+          </button>
+          <span className="text-xs text-[#0EA5A5] bg-[#0EA5A5]/10 border border-[#0EA5A5]/20 px-3 py-1.5 rounded-xl font-bold">
+            {filteredReports.length} بلاغ نشط
+          </span>
+        </div>
       </div>
 
-      {/* شريط البحث والفلاتر الذكية */}
       <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="relative">
           <Search className="absolute right-3.5 top-3.5 size-4 text-muted-foreground" />
@@ -100,7 +108,6 @@ export function LatestReports() {
         </div>
       </div>
 
-      {/* عرض البلاغات بتصميم أنيق ومحسّن */}
       {loading ? (
         <div className="text-center py-16">
           <div className="inline-block size-6 animate-spin rounded-full border-2 border-solid border-[#0EA5A5] border-r-transparent"></div>
@@ -118,7 +125,6 @@ export function LatestReports() {
               className="group overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition-all duration-300 hover:shadow-xl hover:border-[#0EA5A5]/40 flex flex-col justify-between"
             >
               <div>
-                {/* رأس البطاقة مع الصورة والحالة */}
                 <div className="flex gap-3.5 p-4 pb-3">
                   <div className="relative shrink-0">
                     <img
@@ -151,7 +157,6 @@ export function LatestReports() {
                   </div>
                 </div>
 
-                {/* تفاصيل أو وصف المفقود */}
                 <div className="px-4 pb-3">
                   <div className="bg-muted/40 border border-border/50 p-2.5 rounded-2xl">
                     <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
@@ -160,7 +165,6 @@ export function LatestReports() {
                   </div>
                 </div>
 
-                {/* رقم الهاتف بارز */}
                 <div className="px-4 pb-3">
                   <div className="flex items-center justify-between bg-[#0EA5A5]/5 border border-[#0EA5A5]/15 px-3 py-2 rounded-xl text-xs text-[#0EA5A5]">
                     <span className="font-semibold text-[10px] text-muted-foreground">رقم التواصل:</span>
@@ -171,10 +175,8 @@ export function LatestReports() {
                 </div>
               </div>
 
-              {/* أزرار المشاركة والتفاعل في الأسفل */}
               <div className="border-t border-border bg-muted/20 p-3 flex flex-col gap-2">
                 <div className="grid grid-cols-2 gap-2">
-                  {/* زر واتساب */}
                   <button
                     onClick={() => shareOnWhatsApp(report)}
                     className="flex items-center justify-center gap-1 rounded-xl bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 py-2 text-[11px] font-bold transition"
@@ -182,7 +184,6 @@ export function LatestReports() {
                     <MessageCircle className="size-3.5" /> واتساب
                   </button>
 
-                  {/* زر فيسبوك */}
                   <button
                     onClick={() => shareOnFacebook()}
                     className="flex items-center justify-center gap-1 rounded-xl bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 py-2 text-[11px] font-bold transition"
@@ -191,7 +192,6 @@ export function LatestReports() {
                   </button>
                 </div>
 
-                {/* زر تحديد تم العثور عليه */}
                 {report.status !== "تم العثور عليه ✅" && (
                   <button
                     onClick={() => handleMarkAsResolved(report.id)}
