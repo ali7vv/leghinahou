@@ -40,7 +40,6 @@ export default function LoginPage() {
         createdAt: new Date(),
       });
 
-      console.log("جاري إرسال الطلب لسيرفر Render...");
       const response = await fetch("https://laqaynaho-whatsapp-bot.onrender.com/send-otp", {
         method: "POST",
         headers: {
@@ -64,7 +63,7 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error("خطأ تفصيلي في الاتصال:", error);
-      alert("⚠️ حدث خطأ أثناء الاتصال بسيرفر البوت السحابي (قد يحتاج السيرفر لثوانٍ للاستيقاظ).");
+      alert("⚠️ حدث خطأ أثناء الاتصال بسيرفر البوت السحابي.");
     } finally {
       setLoading(false);
     }
@@ -93,7 +92,13 @@ export default function LoginPage() {
 
       login(formattedPhone, fullName, "الخرطوم");
       alert("تم التحقق وتسجيل الدخول بنجاح!");
-      router.push("/");
+      
+      // التوجيه التلقائي للأدمن لو كان رقمك، أو الرئيسية لبقية المستخدمين
+      if (formattedPhone === "+249117550533") {
+        router.push("/admin");
+      } else {
+        router.push("/");
+      }
     } catch (error) {
       console.error("خطأ:", error);
       alert("حدث خطأ أثناء مطابقة الرمز.");
@@ -112,7 +117,7 @@ export default function LoginPage() {
               <label className="text-xs text-muted-foreground block mb-2">الاسم الكامل</label>
               <input
                 type="text"
-                placeholder="مثال: علي عوض"
+                placeholder="مثال: محمد أحمد" /* تم تغيير المثال هنا */
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-xs text-foreground focus:outline-none focus:border-[#0EA5A5]"
@@ -123,7 +128,7 @@ export default function LoginPage() {
               <label className="text-xs text-muted-foreground block mb-2">رقم الهاتف (المرتبط بالواتساب)</label>
               <input
                 type="text"
-                placeholder="912345678 أو 0117550533"
+                placeholder="مثال: 0912345678" /* تم تغيير المثال هنا أيضاً */
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-xs text-foreground focus:outline-none focus:border-[#0EA5A5]"
