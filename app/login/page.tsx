@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState("");
   const [enteredOtp, setEnteredOtp] = useState("");
   const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
 
@@ -31,6 +32,7 @@ export default function LoginPage() {
 
     const formattedPhone = getFormattedPhone(phone);
     const secureOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setLoading(true);
 
     try {
       await setDoc(doc(db, "verificationCodes", formattedPhone), {
@@ -38,7 +40,7 @@ export default function LoginPage() {
         createdAt: new Date(),
       });
 
-      // تم التحديث لاستخدام رابط السيرفر السحابي على Render بدلاً من localhost
+      console.log("جاري إرسال الطلب لسيرفر Render...");
       const response = await fetch("https://laqaynaho-whatsapp-bot.onrender.com/send-otp", {
         method: "POST",
         headers: {
@@ -61,8 +63,10 @@ export default function LoginPage() {
         alert("❌ فشل إرسال الرسالة عبر البوت: " + (data.error || "خطأ غير معروف"));
       }
     } catch (error) {
-      console.error("خطأ في الاتصال بالسيرفر:", error);
-      alert("⚠️ حدث خطأ أثناء الاتصال بسيرفر البوت السحابي.");
+      console.error("خطأ تفصيلي في الاتصال:", error);
+      alert("⚠️ حدث خطأ أثناء الاتصال بسيرفر البوت السحابي (قد يحتاج السيرفر لثوانٍ للاستيقاظ).");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -129,9 +133,10 @@ export default function LoginPage() {
             
             <button
               type="submit"
-              className="w-full bg-[#0EA5A5] text-white py-3 rounded-2xl font-bold text-xs hover:opacity-90 transition"
+              disabled={loading}
+              className="w-full bg-[#0EA5A5] text-white py-3 rounded-2xl font-bold text-xs hover:opacity-90 transition disabled:opacity-50"
             >
-              إرسال رمز التحقق للواتساب
+              {loading ? "جاري الإرسال وتنشيط السيرفر..." : "إرسال رمز التحقق للواتساب"}
             </button>
           </form>
         ) : (
