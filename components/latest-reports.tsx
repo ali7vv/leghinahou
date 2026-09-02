@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, query, orderBy, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/app/firebase";
-import { Search, MapPin, CheckCircle, MessageCircle, Facebook, User } from "lucide-react";
+import { Search, MapPin, CheckCircle, MessageCircle, Share2, User } from "lucide-react";
 
 export default function LatestReports() {
   const [reports, setReports] = useState<any[]>([]);
@@ -188,7 +188,7 @@ export default function LatestReports() {
                     onClick={() => shareOnFacebook()}
                     className="flex items-center justify-center gap-1 rounded-xl bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 py-2 text-[11px] font-bold transition"
                   >
-                    <Facebook className="size-3.5" /> فيسبوك
+                    <Share2 className="size-3.5" /> فيسبوك
                   </button>
                 </div>
 

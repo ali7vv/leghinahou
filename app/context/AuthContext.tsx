@@ -1,57 +1,40 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { doc, setDoc } from "firebase/firestore";
-import { db } from "../firebase"; // تم تصحيح المسار هنا ليطابق مكان ملف الفايربيس
+import React, { createContext, useContext, useState, useEffect } from "react";
 
-interface User {
-  fullName: string;
+interface UserType {
   phone: string;
-  state: string;
+  fullName: string;
+  location?: string;
 }
 
 interface AuthContextType {
-  user: User | null;
-  login: (userData: User) => Promise<void>;
+  user: UserType | null;
+  login: (phone: string, fullName: string, location?: string) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<UserType | null>(null);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem("liqinahem_user");
+    const savedUser = localStorage.getItem("laqaynaho_user");
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
   }, []);
 
-  // دالة تسجيل الدخول والحفظ التلقائي في قاعدة البيانات (Firestore)
-  const login = async (userData: User) => {
-    try {
-      // 1. حفظ البيانات محلياً للسرعة
-      setUser(userData);
-      localStorage.setItem("liqinahem_user", JSON.stringify(userData));
-
-      // 2. حفظ أو تحديث المستخدم في Firestore باستخدام رقم الهاتف كـ ID
-      const userRef = doc(db, "users", userData.phone);
-      await setDoc(userRef, {
-        fullName: userData.fullName,
-        phone: userData.phone,
-        state: userData.state,
-        lastLogin: new Date().toISOString(),
-      }, { merge: true }); // الـ merge عشان لو المستخدم قديم ما يمسح بياناته القديمة ويحدثها بس
-
-    } catch (error) {
-      console.error("خطأ أثناء حفظ بيانات المستخدم في قاعدة البيانات:", error);
-    }
+  const login = (phone: string, fullName: string, location = "الخرطوم") => {
+    const userData = { phone, fullName, location };
+    setUser(userData);
+    localStorage.setItem("laqaynaho_user", JSON.stringify(userData));
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("liqinahem_user");
+    localStorage.removeItem("laqaynaho_user");
   };
 
   return (
