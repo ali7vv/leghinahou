@@ -52,18 +52,18 @@ export default function LoginPage() {
         }),
       });
 
-      const data = await response.json();
-
       if (response.ok) {
         setPhone(formattedPhone);
         setStep(2);
-        alert("✅ تم إرسال رمز التحقق إلى واتساب الخاص بك تلقائياً عبر البوت!");
+        alert("✅ تم إرسال رمز التحقق بنجاح.");
       } else {
-        alert("❌ فشل إرسال الرسالة عبر البوت: " + (data.error || "خطأ غير معروف"));
+        // تم تغيير رسالة الخطأ هنا إلى رسالة عامة جداً لا توضح حالة البوت نهائياً
+        alert("عذراً، حدث خطأ أثناء إرسال الرمز. الرجاء المحاولة مرة أخرى.");
       }
     } catch (error) {
-      console.error("خطأ تفصيلي في الاتصال:", error);
-      alert("⚠️ حدث خطأ أثناء الاتصال بسيرفر البوت السحابي.");
+      console.error("خطأ تفصيلي:", error);
+      // رسالة عامة بدلاً من كشف السيرفر
+      alert("عذراَ، تعذر إتمام الطلب حالياً. يجدر المحاولة لاحقاً.");
     } finally {
       setLoading(false);
     }
@@ -91,9 +91,7 @@ export default function LoginPage() {
       }
 
       login(formattedPhone, fullName, "الخرطوم");
-      alert("تم التحقق وتسجيل الدخول بنجاح!");
       
-      // التوجيه التلقائي للأدمن لو كان رقمك، أو الرئيسية لبقية المستخدمين
       if (formattedPhone === "+249117550533") {
         router.push("/admin");
       } else {
@@ -117,7 +115,7 @@ export default function LoginPage() {
               <label className="text-xs text-muted-foreground block mb-2">الاسم الكامل</label>
               <input
                 type="text"
-                placeholder="مثال: محمد أحمد" /* تم تغيير المثال هنا */
+                placeholder="مثال: محمد أحمد"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-xs text-foreground focus:outline-none focus:border-[#0EA5A5]"
@@ -128,7 +126,8 @@ export default function LoginPage() {
               <label className="text-xs text-muted-foreground block mb-2">رقم الهاتف (المرتبط بالواتساب)</label>
               <input
                 type="text"
-                placeholder="مثال: 0912345678" /* تم تغيير المثال هنا أيضاً */
+                placeholder="مثال: 0912345678"
+                value-={phone}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-xs text-foreground focus:outline-none focus:border-[#0EA5A5]"
@@ -141,14 +140,14 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full bg-[#0EA5A5] text-white py-3 rounded-2xl font-bold text-xs hover:opacity-90 transition disabled:opacity-50"
             >
-              {loading ? "جاري الإرسال وتنشيط السيرفر..." : "إرسال رمز التحقق للواتساب"}
+              {loading ? "جاري الإرسال..." : "إرسال رمز التحقق للواتساب"}
             </button>
           </form>
         ) : (
           <form onSubmit={handleVerifyOtp} className="space-y-4">
             <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl text-xs text-emerald-600 space-y-2">
-              <p className="font-bold">تم إرسال الرمز تلقائياً لرقم الواتساب: {phone}</p>
-              <p className="text-muted-foreground">أدخل الرمز المكون من 6 أرقام الوصلك في رسالة البوت أدناه:</p>
+              <p className="font-bold">تم إرسال الرمز لرقم الواتساب: {phone}</p>
+              <p className="text-muted-foreground">أدخل الرمز المكون من 6 أرقام:</p>
             </div>
 
             <div>
