@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { CheckCircle2, ArrowRight, Heart, MapPin, Calendar, User, FileText } from "lucide-react";
+import { CheckCircle2, ArrowRight, Heart, MapPin, Calendar, User } from "lucide-react";
 
 // استيراد قاعدة البيانات من الفايربيس
 import { db } from "@/app/firebase";
@@ -22,9 +22,13 @@ export default function FoundCasesPage() {
   const [foundCases, setFoundCases] = useState<FoundCase[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // جلب الحالات التي تم العثور عليها من الفايربيس تلقائياً
   useEffect(() => {
-    const q = collection(db, "reports");
+    // جلب البلاغات التي حُددت حالتها كـ "تم العثور عليه" أو "found" فقط
+    const reportsRef = collection(db, "reports");
+    const q = query(
+      reportsRef,
+      where("status", "in", ["تم العثور عليه", "found", "FOUND", "تم العثور"])
+    );
 
     const unsubscribe = onSnapshot(
       q,
@@ -34,39 +38,36 @@ export default function FoundCasesPage() {
         snapshot.docs.forEach((docItem) => {
           const data = docItem.data();
 
-          // التحقق من أن حالة البلاغ هي "تم العثور عليه" أو "found"
-          if (data.status === "تم العثور عليه" || data.status === "found") {
-            // تنسيق التاريخ
-            let dateFormatted = "حديثاً";
-            if (data.updatedAt?.toDate) {
-              dateFormatted = data.updatedAt.toDate().toLocaleDateString("ar-EG", {
-                year: "numeric",
-                month: "long",
-              });
-            } else if (data.createdAt?.toDate) {
-              dateFormatted = data.createdAt.toDate().toLocaleDateString("ar-EG", {
-                year: "numeric",
-                month: "long",
-              });
-            }
-
-            cases.push({
-              id: docItem.id,
-              name: data.name || data.personName || "شخص تم العثور عليه",
-              age: data.age || "غير محدد",
-              location: data.city ? `${data.city} ${data.state ? `- ${data.state}` : ""}` : data.state || "غير محدد",
-              foundDate: dateFormatted,
-              story: data.details || "الحمد لله، بفضل الله وتكاتف المجتمع وأهل الخير تم العثور على الشخص وهو بحالة جيدة وسط ذويه وأهله.",
-              image: data.image || null,
+          // تنسيق تاريخ التحديث أو الإنشاء
+          let dateFormatted = "حديثاً";
+          if (data.updatedAt?.toDate) {
+            dateFormatted = data.updatedAt.toDate().toLocaleDateString("ar-EG", {
+              year: "numeric",
+              month: "long",
+            });
+          } else if (data.createdAt?.toDate) {
+            dateFormatted = data.createdAt.toDate().toLocaleDateString("ar-EG", {
+              year: "numeric",
+              month: "long",
             });
           }
+
+          cases.push({
+            id: docItem.id,
+            name: data.name || data.personName || "شخص تم العثور عليه",
+            age: data.age || "غير محدد",
+            location: data.city ? `${data.city} ${data.state ? `- ${data.state}` : ""}` : data.state || "غير محدد",
+            foundDate: dateFormatted,
+            story: data.details || "الحمد لله، بفضل الله وتكاتف المجتمع وأهل الخير تم العثور على الشخص وهو بحالة جيدة وسط ذويه وأهله.",
+            image: data.image || null,
+          });
         });
 
         setFoundCases(cases);
         setLoading(false);
       },
       (error) => {
-        console.error("خطأ في جلب حالات العثور عليهم:", error);
+        console.error("خطأ في جلب حالات العثور عليهم من الفايربيس:", error);
         setLoading(false);
       }
     );
@@ -77,10 +78,8 @@ export default function FoundCasesPage() {
   return (
     <main className="relative min-h-[90vh] bg-[#030914] py-16 px-4 overflow-hidden" dir="rtl">
       
-      {/* خلفية متدرجة فخمة */}
+      {/* خلفية متدرجة */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#030914] via-[#081322] to-slate-900 opacity-95" />
-      
-      {/* دوائر مضيئة هادئة في الخلفية */}
       <div className="absolute -top-24 -right-24 w-96 h-96 bg-[#00B488]/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -110,13 +109,13 @@ export default function FoundCasesPage() {
         {/* عرض حالة التحميل */}
         {loading ? (
           <div className="text-center py-12 text-gray-400 text-sm">
-            جاري جلب حالات العثور عليهم...
+            جاري جلب حالات العثور عليهم من قاعدة البيانات...
           </div>
         ) : foundCases.length === 0 ? (
           /* في حالة عدم وجود حالات */
           <div className="bg-[#081322] border border-white/10 rounded-3xl p-12 text-center text-gray-400 space-y-3">
             <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto opacity-50" />
-            <h3 className="text-lg font-bold text-white">لا توجد حالات مكتملة حالياً</h3>
+            <h3 className="text-lg font-bold text-white">لا توجد حالات حالياً</h3>
             <p className="text-xs">عند تغيير حالة أي بلاغ إلى (تم العثور عليه)، سيظهر هنا فوراً تلقائياً.</p>
           </div>
         ) : (
