@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/context/AuthContext";
 import { db, auth } from "@/app/firebase";
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect } from "firebase/auth";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -17,6 +17,9 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
+      // منع حجب الجلسة وتحديد الحساب دائماً
+      provider.setCustomParameters({ prompt: "select_account" });
+
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
@@ -50,6 +53,23 @@ export default function LoginPage() {
       }
     } catch (error: any) {
       console.error("خطأ أثناء تسجيل الدخول بـ Google:", error);
+
+      // التعامل مع متصفحات الموبايل التي تحظر Popup
+      if (
+        error.code === "auth/popup-blocked" ||
+        error.code === "auth/popup-closed-by-user" ||
+        error.code === "auth/cancelled-popup-request"
+      ) {
+        try {
+          const provider = new GoogleAuthProvider();
+          provider.setCustomParameters({ prompt: "select_account" });
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectError) {
+          console.error("خطأ في التحويل التلقائي:", redirectError);
+        }
+      }
+
       alert("حدث خطأ أثناء تسجيل الدخول بـ Google: " + (error?.message || ""));
     } finally {
       setLoading(false);
@@ -60,7 +80,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4" dir="rtl">
       <div className="max-w-md w-full bg-card border border-border p-8 rounded-3xl shadow-sm text-center">
         <h2 className="text-xl font-bold mb-2 text-foreground">تسجيل الدخول الآمن والمحمي</h2>
-        
+
         {/* العبارة اللطيفة والقلب */}
         <p className="text-xs text-[#0EA5A5] font-medium mb-8 flex items-center justify-center gap-1.5 bg-[#0EA5A5]/10 py-2.5 px-4 rounded-2xl">
           <span>عشان نسهل عليكم التسجيل بضغطة زر واحدة.. اختر حسابك وادخل فوراً</span>
