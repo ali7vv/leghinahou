@@ -15,7 +15,9 @@ interface UserData {
 interface ReportData {
   id: string;
   personName?: string;
+  name?: string;
   location?: string;
+  city?: string;
   status?: string;
   createdAt?: any;
   [key: string]: any;
@@ -56,14 +58,16 @@ export default function AdminDashboard() {
     }
   };
 
-  // حذف بلاغ معين
+  // حذف بلاغ معين بشكل مباشر
   const handleDeleteReport = async (reportId: string) => {
     if (!confirm("هل أنت متأكد من رغبتك في حذف هذا البلاغ نهائياً؟")) return;
 
     try {
       console.log("محاولة حذف البلاغ برقم:", reportId);
       await deleteDoc(doc(db, "reports", reportId));
-      setReports(reports.filter((r) => r.id !== reportId));
+      
+      // تحديث الحالة محلياً لحذف البلاغ من الجدول فوراً بدون الحاجة لعمل Refresh
+      setReports((prevReports) => prevReports.filter((r) => r.id !== reportId));
       alert("تم حذف البلاغ بنجاح.");
     } catch (error: any) {
       console.error("خطأ أثناء الحذف بالتفصيل:", error);
@@ -72,7 +76,7 @@ export default function AdminDashboard() {
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-xs text-white">جاري تحميل لوحة التحكم...</div>;
+    return <div className="p-8 text-center text-xs text-white bg-slate-950 min-h-screen flex items-center justify-center">جاري تحميل لوحة التحكم...</div>;
   }
 
   return (
