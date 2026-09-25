@@ -3,10 +3,39 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, MapPin, Calendar, User, ArrowRight, X, Phone, FileText, Inbox, Trash2, ZoomIn } from "lucide-react";
+import { useAuth } from "@/app/context/AuthContext";
 
 // استيراد قاعدة البيانات والدوال الخاصة بـ Firebase Firestore
 import { db } from "@/app/firebase"; 
 import { collection, onSnapshot, deleteDoc, doc } from "firebase/firestore";
+
+// قائمة بجميع ولايات السودان الـ 18 والمدن الرئيسية
+const SUDAN_LOCATIONS = [
+  "كل المدن والولايات",
+  "الخرطوم",
+  "أم درمان",
+  "بحري",
+  "ود مدني",
+  "بورتسودان",
+  "ولاية الخرطوم",
+  "ولاية الجزيرة",
+  "ولاية البحر الأحمر",
+  "ولاية كسلا",
+  "ولاية القضارف",
+  "ولاية سنار",
+  "ولاية النيل الأبيض",
+  "ولاية النيل الأزرق",
+  "ولاية الشمالية",
+  "ولاية نهر النيل",
+  "ولاية شمال كردفان",
+  "ولاية جنوب كردفان",
+  "ولاية غرب كردفان",
+  "ولاية شمال دارفور",
+  "ولاية جنوب دارفور",
+  "ولاية غرب دارفور",
+  "ولاية وسط دارفور",
+  "ولاية شرق دارفور"
+];
 
 interface Report {
   id: string;
@@ -19,16 +48,20 @@ interface Report {
   details?: string;
   image?: string | null;
   status?: string;
+  userEmail?: string; // بريد الشخص صاحب البلاغ
   createdAt?: any;
 }
 
 export default function SearchPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState("كل المدن والولايات");
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
-  // جلب البيانات بالوقت الفعلي (Real-time) من Firebase بدون أي شروط صارمة تمنع ظهور البلاغات
+  const { user } = useAuth(); // جلب بيانات المستخدم المسجل حالياً
+
+  // جلب البيانات بالوقت الفعلي (Real-time) من Firebase
   useEffect(() => {
     const q = collection(db, "reports");
     
@@ -46,11 +79,12 @@ export default function SearchPage() {
           details: data.details || "",
           image: data.image || null,
           status: data.status || "missing",
+          userEmail: data.userEmail || data.email || "", // التأكد من جلب بريد الناشر
           createdAt: data.createdAt,
         };
       }) as Report[];
       
-      // ترتيب البلاغات من الأحدث للأقدم برمجياً بأمان تام
+      // ترتيب البلاغات من الأحدث للأقدم برمجياً
       reportsData.sort((a: any, b: any) => {
         const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
         const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
@@ -82,16 +116,33 @@ export default function SearchPage() {
     }
   };
 
-  const filteredReports = reports.filter((item) =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (item.city && item.city.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // التحقق هل المستخدم الحالي هو صاحب البلاغ أم لا
+  const isOwner = (reportEmail?: string) => {
+    if (!user || !user.email) return false;
+    if (user.email === "admin@laqaynaho.com") return true; // الآدمن يمتلك صلاحية الحذف دائماً
+    return reportEmail && user.email.toLowerCase() === reportEmail.toLowerCase();
+  };
+
+  // فلترة البلاغات حسب البحث والولاية/المدينة
+  const filteredReports = reports.filter((item) => {
+    const matchesSearch =
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.city && item.city.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (item.state && item.state.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const matchesLocation =
+      selectedLocation === "كل المدن والولايات" ||
+      item.city === selectedLocation ||
+      item.state === selectedLocation;
+
+    return matchesSearch && matchesLocation;
+  });
 
   return (
     <div className="min-h-screen bg-[#030914] text-white p-4 md:p-8" dir="rtl">
       <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* الشريط العلوي للبحث */}
+        {/* الشريط العلوي للبحث واختيار الولاية */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/10">
           <div>
             <h1 className="text-xl md:text-2xl font-bold">عرض البلاغات والبحث</h1>
@@ -100,11 +151,25 @@ export default function SearchPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 md:w-80">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* القائمة المنسدلة للولايات والمدن الـ 18 */}
+            <select
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+              className="bg-[#081322] border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-[#0EA5A5] cursor-pointer"
+            >
+              {SUDAN_LOCATIONS.map((loc) => (
+                <option key={loc} value={loc} className="bg-[#081322] text-white">
+                  {loc}
+                </option>
+              ))}
+            </select>
+
+            {/* مربع البحث بالاسم */}
+            <div className="relative flex-1 md:w-64">
               <input
                 type="text"
-                placeholder="ابحث بالاسم أو المدينة..."
+                placeholder="ابحث بالاسم..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-4 pr-10 py-2 bg-white/5 border border-white/10 rounded-xl text-xs text-white placeholder-gray-400 outline-none focus:border-[#0EA5A5]"
@@ -155,14 +220,16 @@ export default function SearchPage() {
                       {report.status === "found" ? "تم العثور عليه" : "مفقود"}
                     </span>
 
-                    {/* زر حذف البلاغ */}
-                    <button
-                      onClick={(e) => handleDeleteReport(report.id, e)}
-                      title="حذف البلاغ"
-                      className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 p-1.5 rounded-lg border border-rose-500/20 transition"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {/* زر حذف البلاغ (يظهر فقط لصاحب البلاغ) */}
+                    {isOwner(report.userEmail) && (
+                      <button
+                        onClick={(e) => handleDeleteReport(report.id, e)}
+                        title="حذف البلاغ"
+                        className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 p-1.5 rounded-lg border border-rose-500/20 transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between gap-3">
@@ -198,7 +265,7 @@ export default function SearchPage() {
                   </div>
 
                   <div className="mt-4 space-y-1.5 text-xs text-gray-300 border-t border-white/5 pt-3">
-                    {report.city && (
+                    {(report.city || report.state) && (
                       <div className="flex items-center gap-2">
                         <MapPin className="w-3.5 h-3.5 text-[#0EA5A5]" />
                         <span>{report.city} {report.state ? `- ${report.state}` : ''}</span>
@@ -264,7 +331,7 @@ export default function SearchPage() {
               <div className="space-y-3 text-xs text-gray-300">
                 <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-[#0EA5A5]" />
-                  <span>الموقع: {selectedReport.city || "غير محدد"}</span>
+                  <span>الموقع: {selectedReport.city || selectedReport.state || "غير محدد"}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-400" />
@@ -296,13 +363,16 @@ export default function SearchPage() {
               </div>
 
               <div className="flex items-center gap-3 pt-2">
-                <button
-                  onClick={() => handleDeleteReport(selectedReport.id)}
-                  className="flex-1 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/30 text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>حذف البلاغ</span>
-                </button>
+                {/* زر الحذف داخل النافذة المنبثقة يظهر فقط لصاحب البلاغ */}
+                {isOwner(selectedReport.userEmail) && (
+                  <button
+                    onClick={() => handleDeleteReport(selectedReport.id)}
+                    className="flex-1 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/30 text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>حذف البلاغ</span>
+                  </button>
+                )}
                 
                 <button
                   onClick={() => setSelectedReport(null)}
