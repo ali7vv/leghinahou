@@ -23,7 +23,6 @@ export default function FoundCasesPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // جلب كافة المستندات في reports وفلترتها محلياً لتفادي مشاكل الـ Query Indexes
     const reportsRef = collection(db, "reports");
 
     const unsubscribe = onSnapshot(
@@ -31,20 +30,19 @@ export default function FoundCasesPage() {
       (snapshot) => {
         const cases: FoundCase[] = [];
 
-        console.log("=== عدد البلاغات الكلي في الفايربيس:", snapshot.docs.length);
-
         snapshot.docs.forEach((docItem) => {
           const data = docItem.data();
-          console.log("تقرير برقم:", docItem.id, "بياناته:", data);
 
-          // فحص جميع الاحتمالات الممكنة لحقل الحالة
-          const statusVal = String(data.status || data.caseStatus || data.state || "").trim().toLowerCase();
-          
+          // تنظيف حقل الحالة من المسافات الزائدة وحسب أي نص مدخل
+          const rawStatus = String(data.status || data.caseStatus || data.state || "");
+          const cleanStatus = rawStatus.trim().toLowerCase();
+
+          // التحقق الذكي من وجود كلمة "العثور" أو "found"
           const isFound = 
-            statusVal === "تم العثور عليه" || 
-            statusVal === "تم العثور" || 
-            statusVal === "found" ||
-            data.status === "تم العثور عليه";
+            cleanStatus.includes("العثور") || 
+            cleanStatus.includes("found") || 
+            cleanStatus === "تم العثور عليه" ||
+            cleanStatus === "تم العثور";
 
           if (isFound) {
             let dateFormatted = "حديثاً";
@@ -64,7 +62,7 @@ export default function FoundCasesPage() {
               id: docItem.id,
               name: data.name || data.personName || "شخص تم العثور عليه",
               age: data.age || "غير محدد",
-              location: data.city ? `${data.city} ${data.state ? `- ${data.state}` : ""}` : data.state || "غير محدد",
+              location: data.city ? `${data.city} ${data.state ? `- ${data.state}` : ""}` : data.state || data.location || "غير محدد",
               foundDate: dateFormatted,
               story: data.details || "الحمد لله، بفضل الله وتكاتف المجتمع وأهل الخير تم العثور على الشخص وهو بحالة جيدة وسط ذويه وأهله.",
               image: data.image || null,
@@ -118,7 +116,7 @@ export default function FoundCasesPage() {
         {/* حالة التحميل */}
         {loading ? (
           <div className="text-center py-12 text-gray-400 text-sm">
-            جاري جلب حالات العثور عليهم من قاعدة البيانات...
+            جاري جلب حالات العثور عليهم...
           </div>
         ) : foundCases.length === 0 ? (
           /* حالة لا توجد حالات */
