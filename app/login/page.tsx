@@ -12,12 +12,15 @@ export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
 
+  // بريد الأدمن الرئيسي
+  const ADMIN_EMAIL = "b3eed2009@gmail.com";
+
   // تسجيل الدخول باستخدام Google
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      // منع حجب الجلسة وتحديد الحساب دائماً
+      // اختيار الحساب دائماً وتجنب مسح الجلسة
       provider.setCustomParameters({ prompt: "select_account" });
 
       const result = await signInWithPopup(auth, provider);
@@ -27,7 +30,7 @@ export default function LoginPage() {
       const userName = user.displayName || "مستخدم جديد";
       const photoURL = user.photoURL || "";
 
-      // حفظ/تحديث بيانات المستخدم في Firestore
+      // حفظ أو تحديث بيانات المستخدم في Firestore
       if (userEmail) {
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
@@ -38,7 +41,7 @@ export default function LoginPage() {
             name: userName,
             email: userEmail,
             photoURL: photoURL,
-            role: userEmail === "admin@laqaynaho.com" ? "admin" : "user",
+            role: userEmail === ADMIN_EMAIL ? "admin" : "user",
             createdAt: new Date(),
           });
         }
@@ -46,7 +49,8 @@ export default function LoginPage() {
 
       login(userEmail, userName, "الخرطوم");
 
-      if (userEmail === "admin@laqaynaho.com") {
+      // التوجيه بناءً على صلاحية البريد
+      if (userEmail === ADMIN_EMAIL) {
         router.push("/admin");
       } else {
         router.push("/");
@@ -54,7 +58,7 @@ export default function LoginPage() {
     } catch (error: any) {
       console.error("خطأ أثناء تسجيل الدخول بـ Google:", error);
 
-      // التعامل مع متصفحات الموبايل التي تحظر Popup
+      // التعامل مع المتصفحات التي تحظر الـ Popup في الموبايل
       if (
         error.code === "auth/popup-blocked" ||
         error.code === "auth/popup-closed-by-user" ||
@@ -81,7 +85,7 @@ export default function LoginPage() {
       <div className="max-w-md w-full bg-card border border-border p-8 rounded-3xl shadow-sm text-center">
         <h2 className="text-xl font-bold mb-2 text-foreground">تسجيل الدخول الآمن والمحمي</h2>
 
-        {/* العبارة اللطيفة والقلب */}
+        {/* العبارة الترحيبية */}
         <p className="text-xs text-[#0EA5A5] font-medium mb-8 flex items-center justify-center gap-1.5 bg-[#0EA5A5]/10 py-2.5 px-4 rounded-2xl">
           <span>عشان نسهل عليكم التسجيل بضغطة زر واحدة.. اختر حسابك وادخل فوراً</span>
           <span className="text-red-500 text-sm">❤️</span>
