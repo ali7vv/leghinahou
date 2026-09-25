@@ -1,64 +1,105 @@
-"use client"
+"use client";
 
-import React, { useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { ArrowRight, Upload, CheckCircle2, User, Phone, MapPin, Activity, Heart } from "lucide-react"
+import React, { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowRight, Upload, CheckCircle2, User, Phone, MapPin, Activity, Heart } from "lucide-react";
+import { useAuth } from "@/app/context/AuthContext";
+
+// استيراد الفايربيس بدلاً من LocalStorage
+import { db, auth } from "@/app/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+
+// قائمة بجميع ولايات السودان الـ 18
+const SUDAN_STATES = [
+  "الخرطوم",
+  "الجزيرة",
+  "البحر الأحمر",
+  "كسلا",
+  "القضارف",
+  "سنار",
+  "النيل الأبيض",
+  "النيل الأزرق",
+  "الشمالية",
+  "نهر النيل",
+  "شمال كردفان",
+  "غرب كردفان",
+  "جنوب كردفان",
+  "شمال دارفور",
+  "جنوب دارفور",
+  "غرب دارفور",
+  "وسط دارفور",
+  "شرق دارفور",
+];
 
 export default function FoundReportPage() {
-  const router = useRouter()
-  const [submitted, setSubmitted] = useState(false)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const router = useRouter();
+  const { user } = useAuth();
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
     age: "",
+    state: "",
     city: "",
     phone: "",
     details: "",
-    status: "found",
-  })
+  });
 
   // معالجة رفع صورة المعثور عليه
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader()
+      const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
-  }
+  };
 
-  // حفظ بلاغ العثور في LocalStorage
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  // حفظ بلاغ العثور في Firebase Firestore
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-    const newReport = {
-      id: Date.now().toString(),
-      name: formData.name || "شخص غير معروف (تم العثور عليه)",
-      age: formData.age || "غير محدد",
-      city: formData.city,
-      missingSince: new Date().toISOString().split("T")[0],
-      phone: formData.phone,
-      details: formData.details,
-      status: "found",
-      image: imagePreview,
-      createdAt: new Date().toISOString(),
+    const currentUser = auth.currentUser;
+    const currentUserId = currentUser?.uid || user?.id || "";
+
+    try {
+      setSubmitting(true);
+
+      const cleanPhone = formData.phone.replace(/\s+/g, "").replace(/-/g, "");
+
+      // رفع البلاغ إلى مجموعة reports في الفايربيس
+      await addDoc(collection(db, "reports"), {
+        userId: currentUserId,
+        name: formData.name || "شخص غير معروف (تم العثور عليه)",
+        personName: formData.name || "شخص غير معروف (تم العثور عليه)",
+        age: formData.age || "غير محدد",
+        state: formData.state || "",
+        city: formData.city || "",
+        phone: cleanPhone,
+        details: formData.details || "",
+        status: "تم العثور عليه", // تحديد الحالة بالعربي لمطابقة صفحة البحث
+        image: imagePreview || null,
+        userName: user?.fullName || currentUser?.displayName || "فاعل خير",
+        userEmail: user?.email || currentUser?.email || "",
+        createdAt: serverTimestamp(),
+      });
+
+      setSubmitted(true);
+      setTimeout(() => {
+        router.push("/search");
+      }, 2000);
+    } catch (error: any) {
+      console.error("خطأ في نشر بلاغ العثور عليه:", error);
+      alert("حدث خطأ أثناء نشر البلاغ: " + (error?.message || ""));
+    } finally {
+      setSubmitting(false);
     }
-
-    const savedReports = localStorage.getItem("liqinahem_reports")
-    const reports = savedReports ? JSON.parse(savedReports) : []
-
-    // إضافة البلاغ الجديد في بداية القائمة
-    localStorage.setItem("liqinahem_reports", JSON.stringify([newReport, ...reports]))
-
-    setSubmitted(true)
-    setTimeout(() => {
-      router.push("/search")
-    }, 2000)
-  }
+  };
 
   return (
     <div className="min-h-screen bg-[#030914] text-white p-4 md:p-8" dir="rtl">
@@ -136,11 +177,30 @@ export default function FoundReportPage() {
               </div>
             </div>
 
-            {/* مكان العثور عليه ورقم التواصل */}
+            {/* الولاية والمدينة */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-300 flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-emerald-400" /> مكان العثور عليه *
+                  <MapPin className="w-3.5 h-3.5 text-emerald-400" /> الولاية *
+                </label>
+                <select
+                  required
+                  value={formData.state}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                  className="w-full bg-[#081322] border border-white/10 rounded-xl p-3 text-xs text-white outline-none focus:border-emerald-400"
+                >
+                  <option value="">اختر الولاية...</option>
+                  {SUDAN_STATES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-300 flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-400" /> المدينة / الحي *
                 </label>
                 <input
                   type="text"
@@ -151,20 +211,21 @@ export default function FoundReportPage() {
                   className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white outline-none focus:border-emerald-400"
                 />
               </div>
+            </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-300 flex items-center gap-1">
-                  <Phone className="w-3.5 h-3.5 text-emerald-400" /> رقم التواصل مع المتواجد معه *
-                </label>
-                <input
-                  type="tel"
-                  required
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="0912345678"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white outline-none focus:border-emerald-400 dir-ltr text-right"
-                />
-              </div>
+            {/* رقم التواصل */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-300 flex items-center gap-1">
+                <Phone className="w-3.5 h-3.5 text-emerald-400" /> رقم التواصل مع المتواجد معه *
+              </label>
+              <input
+                type="tel"
+                required
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="0912345678"
+                className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white outline-none focus:border-emerald-400 dir-ltr text-right"
+              />
             </div>
 
             {/* تفاصيل إضافية والحالة الصحية */}
@@ -184,14 +245,15 @@ export default function FoundReportPage() {
             {/* زر الإرسال */}
             <button
               type="submit"
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl text-xs transition shadow-lg shadow-emerald-500/20"
+              disabled={submitting}
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl text-xs transition shadow-lg shadow-emerald-500/20 disabled:opacity-50"
             >
-              نشر البلاغ الآن
+              {submitting ? "جاري نشر البلاغ..." : "نشر البلاغ الآن"}
             </button>
           </form>
         )}
 
       </div>
     </div>
-  )
+  );
 }
