@@ -5,8 +5,30 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+
+// قائمة ولايات السودان الـ 18
+const SUDAN_STATES = [
+  "الخرطوم",
+  "الجزيرة",
+  "البحر الأحمر",
+  "كسلا",
+  "القضارف",
+  "سنار",
+  "النيل الأبيض",
+  "النيل الأزرق",
+  "الشمالية",
+  "نهر النيل",
+  "شمال كردفان",
+  "غرب كردفان",
+  "جنوب كردفان",
+  "شمال دارفور",
+  "جنوب دارفور",
+  "غرب دارفور",
+  "وسط دارفور",
+  "شرق دارفور",
+];
 
 export default function ReportPage() {
   const router = useRouter();
@@ -33,26 +55,28 @@ export default function ReportPage() {
     }
   };
 
-  // إرسال البلاغ مباشرة بدون الحاجة لكود تحقق (OTP)
+  // إرسال البلاغ
   const handleSubmitReport = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!user) {
+    const currentUser = auth.currentUser;
+
+    if (!user && !currentUser) {
       alert("الرجاء تسجيل الدخول أولاً.");
       router.push("/login");
       return;
     }
 
-    // 1. فحص طول النص (ألا يقل عن 10 حروف) لضمان المصداقية ومنع السبام
+    // 1. فحص طول النص لضمان المصداقية
     if (details.trim().length < 10) {
       alert("عذراً، يجب أن تكون تفاصيل المفقود أكثر من 10 حروف لضمان المصداقية.");
       return;
     }
 
-    // 2. حماية منع التكرار السريع (Rate Limiting محلي لمنع ضغط الزر المتكرر)
+    // 2. حماية منع التكرار السريع
     const lastReportTime = localStorage.getItem("last_report_time");
     const now = Date.now();
-    if (lastReportTime && now - parseInt(lastReportTime) < 30000) { // منع إرسال بلاغ آخر إلا بعد 30 ثانية
+    if (lastReportTime && now - parseInt(lastReportTime) < 30000) {
       alert("الرجاء الانتظار قليلاً قبل إرسال بلاغ جديد لمنع الضغط على المنصة.");
       return;
     }
@@ -62,19 +86,25 @@ export default function ReportPage() {
     try {
       setSubmitting(true);
 
-      // رفع البلاغ للـ Firestore مباشرة
+      // الحصول على ID المستخدم المسجل
+      const currentUserId = currentUser?.uid || user?.id || "";
+
+      // رفع البلاغ للـ Firestore مع إرفاق الـ userId لحفظ الملكية
       await addDoc(collection(db, "reports"), {
+        userId: currentUserId, // هامة جداً للتحكم والحذف من قبل الناشر
+        personName: name,      // مطابقة تسمية اسم المفقود
         name,
         age,
         state,
+        location: state ? `${state}${city ? ` - ${city}` : ""}` : city,
         city,
         missingSince,
         phone: cleanPhone,
         details,
         image: image || null,
         status: "نشط",
-        userName: user.fullName || "مستخدم",
-        userPhone: user.phone || "",
+        userName: user?.fullName || currentUser?.displayName || "مستخدم",
+        userPhone: user?.phone || "",
         createdAt: serverTimestamp(),
       });
 
@@ -83,11 +113,11 @@ export default function ReportPage() {
 
       alert(
         "✨ تم نشر البلاغ بنجاح 🤍\n\n" +
-        "﴿وَبَشِّرِ الصَّابِرِينَ﴾\n" +
-        "اللهم رد كل غائب إلى أهله سالماً معافى 🤲"
+          "﴿وَبَشِّرِ الصَّابِرِينَ﴾\n" +
+          "اللهم رد كل غائب إلى أهله سالماً معافى 🤲"
       );
 
-      // توجيه المستخدم للصفحة الرئيسية مع التمرير التلقائي (Scroll) لقسم أحدث البلاغات
+      // التوجيه للصفحة الرئيسية
       router.push("/");
       setTimeout(() => {
         const element = document.getElementById("latest-reports-section");
@@ -95,7 +125,6 @@ export default function ReportPage() {
           element.scrollIntoView({ behavior: "smooth" });
         }
       }, 500);
-
     } catch (error: any) {
       console.error("خطأ في النشر:", error);
       alert("حدث خطأ أثناء نشر البلاغ. تأكد من اتصالك بالإنترنت وجرب لاحقاً.");
@@ -104,13 +133,21 @@ export default function ReportPage() {
     }
   };
 
-  if (!user) {
+  if (!user && !auth.currentUser) {
     return (
-      <div className="min-h-screen bg-[#030914] text-white flex flex-col items-center justify-center p-4 text-center" dir="rtl">
+      <div
+        className="min-h-screen bg-[#030914] text-white flex flex-col items-center justify-center p-4 text-center"
+        dir="rtl"
+      >
         <div className="bg-[#081322] border border-white/10 p-8 rounded-2xl max-w-md w-full space-y-4">
           <h2 className="text-lg font-bold text-rose-400">تنبيه أمني</h2>
-          <p className="text-xs text-gray-300">يجب تسجيل الدخول بحسابك أولاً لكي تتمكن من نشر بلاغ مفقود.</p>
-          <Link href="/login" className="block w-full bg-[#0EA5A5] text-white font-bold py-3 rounded-xl text-xs transition hover:bg-[#0EA5A5]/90">
+          <p className="text-xs text-gray-300">
+            يجب تسجيل الدخول بحسابك أولاً لكي تتمكن من نشر بلاغ مفقود.
+          </p>
+          <Link
+            href="/login"
+            className="block w-full bg-[#0EA5A5] text-white font-bold py-3 rounded-xl text-xs transition hover:bg-[#0EA5A5]/90"
+          >
             تسجيل الدخول
           </Link>
         </div>
@@ -121,24 +158,32 @@ export default function ReportPage() {
   return (
     <div className="min-h-screen bg-[#030914] text-white p-4 md:p-8" dir="rtl">
       <div className="max-w-3xl mx-auto space-y-6">
-        
         {/* الشريط العلوي */}
         <div className="flex items-center justify-between pb-6 border-b border-white/10">
           <div>
             <h1 className="text-xl font-bold">إضافة بلاغ مفقود</h1>
-            <p className="text-xs text-gray-400 mt-1">أهلاً بك، {user.fullName}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              أهلاً بك، {user?.fullName || auth.currentUser?.displayName || "مستخدم"}
+            </p>
           </div>
-          <Link href="/" className="text-xs text-gray-400 hover:text-white flex items-center gap-1 bg-white/5 px-3 py-2 rounded-xl border border-white/10 transition">
+          <Link
+            href="/"
+            className="text-xs text-gray-400 hover:text-white flex items-center gap-1 bg-white/5 px-3 py-2 rounded-xl border border-white/10 transition"
+          >
             <ArrowRight className="w-4 h-4" /> الرئيسية
           </Link>
         </div>
 
         {/* نموذج البلاغ */}
-        <form onSubmit={handleSubmitReport} className="bg-[#081322] border border-white/10 rounded-2xl p-6 space-y-5">
-          
+        <form
+          onSubmit={handleSubmitReport}
+          className="bg-[#081322] border border-white/10 rounded-2xl p-6 space-y-5"
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-gray-300 block mb-1">اسم المفقود <span className="text-rose-500">*</span></label>
+              <label className="text-xs text-gray-300 block mb-1">
+                اسم المفقود <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="text"
                 required
@@ -150,7 +195,9 @@ export default function ReportPage() {
             </div>
 
             <div>
-              <label className="text-xs text-gray-300 block mb-1">العمر <span className="text-rose-500">*</span></label>
+              <label className="text-xs text-gray-300 block mb-1">
+                العمر <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="number"
                 required
@@ -164,14 +211,22 @@ export default function ReportPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-gray-300 block mb-1">الولاية / المنطقة</label>
-              <input
-                type="text"
+              <label className="text-xs text-gray-300 block mb-1">
+                الولاية <span className="text-rose-500">*</span>
+              </label>
+              <select
+                required
                 value={state}
                 onChange={(e) => setState(e.target.value)}
-                placeholder="مثال: الخرطوم..."
-                className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#0EA5A5]"
-              />
+                className="w-full p-3 bg-[#081322] border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#0EA5A5]"
+              >
+                <option value="">اختر الولاية...</option>
+                {SUDAN_STATES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -180,7 +235,7 @@ export default function ReportPage() {
                 type="text"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                placeholder="مثال: أمدرمان..."
+                placeholder="مثال: أمدرمان، بحري..."
                 className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#0EA5A5]"
               />
             </div>
@@ -193,13 +248,15 @@ export default function ReportPage() {
                 type="text"
                 value={missingSince}
                 onChange={(e) => setMissingSince(e.target.value)}
-                placeholder="مثال: أمس..."
+                placeholder="مثال: منذ أسبوع، تاريخ محدد..."
                 className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#0EA5A5]"
               />
             </div>
 
             <div>
-              <label className="text-xs text-gray-300 block mb-1">رقم التواصل <span className="text-rose-500">*</span></label>
+              <label className="text-xs text-gray-300 block mb-1">
+                رقم التواصل <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="text"
                 required
@@ -223,7 +280,9 @@ export default function ReportPage() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-300 block mb-1">تفاصيل إضافية أو علامات مميزة (أكثر من 10 حروف) <span className="text-rose-500">*</span></label>
+            <label className="text-xs text-gray-300 block mb-1">
+              تفاصيل إضافية أو علامات مميزة (أكثر من 10 حروف) <span className="text-rose-500">*</span>
+            </label>
             <textarea
               rows={4}
               required
@@ -241,7 +300,6 @@ export default function ReportPage() {
           >
             {submitting ? "جاري نشر البلاغ..." : "نشر البلاغ رسمياً"}
           </button>
-
         </form>
       </div>
     </div>
